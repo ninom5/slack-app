@@ -1,4 +1,4 @@
-import { app, db } from "./config.ts";
+import { app, db } from "../config.ts";
 import admin from "firebase-admin";
 
 app.command("/note", async ({ command, ack, say }) => {

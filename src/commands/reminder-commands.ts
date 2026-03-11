@@ -1,4 +1,4 @@
-import { app, db } from "./config.ts";
+import { app, db } from "../config.ts";
 import admin from "firebase-admin";
 
 const dateRegex = /^\d{2}\.\d{2}\.\d{4}\.?$/;

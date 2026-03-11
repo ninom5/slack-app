@@ -1,5 +1,5 @@
 import cron from "node-cron";
-import { app, db } from "./config.ts";
+import { app, db } from "../config.ts";
 
 cron.schedule(
   "0 9 * * *",
