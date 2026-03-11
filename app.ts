@@ -1,32 +1,10 @@
-import pkg from "@slack/bolt";
-import { channel } from "diagnostics_channel";
-import dotenv from "dotenv";
+import { app, db } from "./config.ts";
 import admin from "firebase-admin";
-import fs from "fs";
-
-dotenv.config();
-const { App } = pkg;
-
-const serviceAccount = JSON.parse(
-  fs.readFileSync(new URL("./firebase-key.json", import.meta.url)),
-);
-
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
-
-const db = admin.firestore();
-
-const app = new App({
-  token: process.env.SLACK_BOT_TOKEN,
-  signingSecret: process.env.SLACK_SIGNING_SECRET,
-  socketMode: true,
-  appToken: process.env.SLACK_APP_TOKEN,
-  port: process.env.PORT || 3000,
-});
 
 app.command("/note", async ({ command, ack, say }) => {
   await ack();
+
+  const user = command.user_id + "__" + command.user_name;
 
   const noteContent = command.text.trim();
   if (noteContent.length === 0) {
@@ -47,7 +25,11 @@ app.command("/note", async ({ command, ack, say }) => {
   }
 
   try {
-    const projectRef = db.collection("projects").doc(noteName);
+    const projectRef = db
+      .collection("users")
+      .doc(user)
+      .collection("projects")
+      .doc(noteName);
 
     await projectRef.set(
       {
@@ -68,6 +50,8 @@ app.command("/note", async ({ command, ack, say }) => {
 app.command("/read", async ({ command, ack, say }) => {
   await ack();
 
+  const user = command.user_id + "__" + command.user_name;
+
   const noteName = command.text.trim();
 
   if (noteName.length === 0) {
@@ -78,7 +62,12 @@ app.command("/read", async ({ command, ack, say }) => {
   }
 
   try {
-    const doc = await db.collection("projects").doc(noteName).get();
+    const doc = await db
+      .collection("users")
+      .doc(user)
+      .collection("projects")
+      .doc(noteName)
+      .get();
 
     if (!doc.exists) {
       await say(`Nije pronađena datoteka s imenom: *${noteName}*`);
@@ -86,14 +75,17 @@ app.command("/read", async ({ command, ack, say }) => {
     }
 
     const projectData = doc.data();
-    const notesArray = projectData.notes || [];
 
-    if (notesArray.length === 0) {
+    if (!projectData || !projectData.notes) {
       await say(`Datoteka *${noteName}* postoji, ali nema bilješki.`);
       return;
     }
 
-    const formattedNotes = notesArray.map((note) => `• ${note}`).join("\n\t");
+    const notesArray = projectData.notes || [];
+
+    const formattedNotes = notesArray
+      .map((note: string) => `• ${note}`)
+      .join("\n\t");
 
     await say(`*Bilješke za ${noteName}:*\n\t${formattedNotes}`);
   } catch (error) {
@@ -105,6 +97,8 @@ app.command("/read", async ({ command, ack, say }) => {
 app.command("/delete", async ({ command, ack, say }) => {
   await ack();
 
+  const user = command.user_id + "__" + command.user_name;
+
   const noteName = command.text.trim();
 
   if (noteName.length === 0) {
@@ -115,7 +109,12 @@ app.command("/delete", async ({ command, ack, say }) => {
   }
 
   try {
-    const doc = await db.collection("projects").doc(noteName).get();
+    const doc = await db
+      .collection("users")
+      .doc(user)
+      .collection("projects")
+      .doc(noteName)
+      .get();
 
     if (!doc.exists) {
       await say(`Nije pronađena datoteka s imenom: *${noteName}*`);
@@ -123,9 +122,15 @@ app.command("/delete", async ({ command, ack, say }) => {
     }
 
     const projectData = doc.data();
-    const notesArray = projectData.notes || [];
 
-    await db.collection("projects").doc(noteName).delete();
+    const notesArray = projectData?.notes || [];
+
+    await db
+      .collection("users")
+      .doc(user)
+      .collection("projects")
+      .doc(noteName)
+      .delete();
 
     await say(
       `*Datoteka: ${noteName} uspješno obrisana!*\t\nSadržaj datoteke:\n\t${notesArray.join("\n\t")}`,
@@ -136,11 +141,17 @@ app.command("/delete", async ({ command, ack, say }) => {
   }
 });
 
-app.command("/list", async ({ ack, say }) => {
+app.command("/list", async ({ command, ack, say }) => {
   await ack();
 
+  const user = command.user_id + "__" + command.user_name;
+
   try {
-    const snapshot = await db.collection("projects").get();
+    const snapshot = await db
+      .collection("users")
+      .doc(user)
+      .collection("projects")
+      .get();
     const projectNames = snapshot.docs.map((doc) => doc.id);
 
     if (projectNames.length === 0) {
@@ -176,7 +187,7 @@ app.command("/clear", async ({ command, ack, say, client }) => {
     for (const message of messages) {
       await client.chat.delete({
         channel: command.channel_id,
-        ts: message.ts,
+        ts: message.ts ?? "",
       });
 
       deletedCount++;
