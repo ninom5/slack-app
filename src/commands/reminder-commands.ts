@@ -139,10 +139,16 @@ app.command("/list-reminders", async ({ command, ack, say }) => {
     remindersSnapshot.forEach((doc) => {
       const reminderData = doc.data();
       const tasks = reminderData.tasks || [];
+      const scheduledTasks = reminderData.scheduled_tasks || [];
 
       response += `\n *${doc.id}*:\n`;
+
       tasks.forEach((task: string) => {
         response += `\t• ${task}\n`;
+      });
+
+      scheduledTasks.forEach((task: any) => {
+        response += `\t• ${task.time} - ${task.text}\n`;
       });
     });
 
