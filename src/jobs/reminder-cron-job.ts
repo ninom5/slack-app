@@ -36,6 +36,32 @@ cron.schedule(
           text: `*Imate podsjetnike za danas (${todayString}):*\n${formattedTasks}`,
         });
 
+        const scheduledTasks = reminderData?.scheduled_tasks || [];
+
+        for (const task of scheduledTasks) {
+          const [hour, minute] = task.time.split(":");
+
+          cron.schedule(
+            `${minute} ${hour} * * *`,
+            async () => {
+              await app.client.chat.postMessage({
+                channel: slackUserId,
+                text: `*Podsjetnik:* ${task.text}`,
+              });
+              console.log(
+                `Poslan planirani podsjetnik u ${task.time} za ${userId}`,
+              );
+            },
+            {
+              timezone: "Europe/Zagreb",
+            },
+          );
+
+          console.log(
+            `Zakazan podsjetnik u ${task.time} za korisnika ${userId}`,
+          );
+        }
+
         await todayReminderDoc.ref.delete();
       }
     } catch (error) {

@@ -54,6 +54,69 @@ app.command("/reminder", async ({ command, ack, say }) => {
   }
 });
 
+app.command("/reminder-by-hour", async ({ command, ack, say }) => {
+  await ack();
+
+  const user = command.user_id + "__" + command.user_name;
+  const rawText = command.text.trim();
+
+  const regex = /^(\d{2}\.\d{2}\.\d{4}\.?)\s*\[(.*?)\]\s*(.*)$/;
+
+  const match = rawText.match(regex);
+
+  if (!match) {
+    await say(
+      "Neispravan format. Koristite: `/reminder-by-hour DD.MM.YYYY [HH:mm, HH:mm] tekst`.",
+    );
+
+    return;
+  }
+
+  let [_, dateString, timesString, reminderText] = match;
+
+  const cleanDateString = dateString.endsWith(".")
+    ? dateString.slice(0, -1)
+    : dateString;
+
+  const times = timesString
+    .split(",")
+    .map((t) => t.trim())
+    .filter((t) => /^([01]\d|2[0-3]):([0-5]\d)$/.test(t));
+
+  if (times.length === 0 || !reminderText) {
+    await say(
+      "Morate unijeti barem jedno ispravno vrijeme (HH:mm) i tekst podsjetnika.",
+    );
+    return;
+  }
+
+  try {
+    const reminderRef = db
+      .collection("users")
+      .doc(user)
+      .collection("reminders")
+      .doc(cleanDateString);
+
+    const newEntries = times.map((time) => ({
+      time,
+      text: reminderText,
+      sent: false,
+    }));
+
+    await reminderRef.set(
+      { scheduled_tasks: admin.firestore.FieldValue.arrayUnion(...newEntries) },
+      { merge: true },
+    );
+
+    await say(
+      `Podsjetnik spremljen za *${cleanDateString}* u terminima: *${times.join(", ")}*`,
+    );
+  } catch (error) {
+    console.error("Greška pri spremanju:", error);
+    await say("Pogreška prilikom spremanja u bazu.");
+  }
+});
+
 app.command("/list-reminders", async ({ command, ack, say }) => {
   await ack();
 
